@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getPosts } from '../../lib/posts';
+const posts = await getPosts();
+---
+<BaseLayout title="Blog" description="All blog posts, newest first.">
+  <section class="page-heading">
+    <h1 class="page-title">Blog</h1>
+  </section>
+  <div class="grid gap-4 md:grid-cols-3">
+    {posts.map((post, index) => <PostCard post={post} index={index} />)}
+  </div>
+</BaseLayout>

@@ -1,0 +1,11 @@
+---
+import Navigation from './Navigation.astro';
+import { site } from '../config';
+import { withBase } from '../lib/paths';
+---
+<header class="shell flex flex-wrap items-center justify-between gap-5 border-b border-line py-7">
+  <a href={withBase()} class="text-xl font-semibold tracking-tight" aria-label={`${site.name} home`}>
+    {site.name}
+  </a>
+  <Navigation />
+</header>

@@ -1,0 +1,24 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPosts, formatDate } from '../../lib/posts';
+import { withBase } from '../../lib/paths';
+
+export async function getStaticPaths() {
+  return (await getPosts()).map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+interface Props { post: CollectionEntry<'blog'>; }
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+<BaseLayout title={post.data.title} description={post.data.description}>
+  <article class="mx-auto max-w-3xl pt-12 sm:pt-20">
+    <a class="text-link text-sm text-muted" href={withBase('blog/')}><span aria-hidden="true">←</span> Back to the blog</a>
+    <header class="mb-10 mt-12 border-b border-line pb-10">
+      <div class="mb-5 flex flex-wrap gap-4"><span class="eyebrow">{post.data.category}</span><time class="text-xs text-muted" datetime={post.data.published.toISOString()}>{formatDate(post.data.published)}</time></div>
+      <h1 class="text-4xl font-medium leading-tight tracking-tight sm:text-6xl">{post.data.title}</h1>
+      <p class="mt-6 text-lg leading-8 text-muted">{post.data.description}</p>
+    </header>
+    <div class="prose"><Content /></div>
+  </article>
+</BaseLayout>

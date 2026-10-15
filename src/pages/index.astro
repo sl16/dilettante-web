@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { getPosts } from '../lib/posts';
+const posts = (await getPosts()).slice(0, 3);
+---
+<BaseLayout>
+  <section class="home-hero">
+    <h1 class="hero-title">dilettante</h1>
+    <p class="mt-5 max-w-2xl text-base leading-8 text-muted">
+      <a class="definition-link" href="https://dictionary.cambridge.org/dictionary/english/dilettante">a person whose interest in an area of knowledge is not very deep or serious</a>
+    </p>
+    <p class="mt-5 text-base">Yup. That's me. I'm just doing things for fun. Welcome.</p>
+  </section>
+  <section class="border-t border-line pt-8" aria-label="Newest blog posts">
+    <div class="grid gap-4 md:grid-cols-3">
+      {posts.map((post, index) => <PostCard post={post} index={index} />)}
+    </div>
+  </section>
+</BaseLayout>

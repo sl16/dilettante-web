@@ -1,0 +1,17 @@
+---
+import { withBase } from '../lib/paths';
+
+const links = [
+  { label: 'Blog', path: 'blog/' },
+  { label: 'Game of Life', path: 'game-of-life/' },
+];
+---
+<nav aria-label="Main navigation" class="flex items-center gap-6 sm:gap-9">
+  {links.map(({ label, path }) => (
+    <a
+      href={withBase(path)}
+      aria-current={Astro.url.pathname.startsWith(withBase(path)) ? 'page' : undefined}
+      class="nav-link"
+    >{label}</a>
+  ))}
+</nav>

@@ -1,0 +1,39 @@
+<writing-desk class="writing-desk">
+  <label class="mb-3 block text-sm font-medium">
+    Your text
+    <textarea class="mt-3 block min-h-56 w-full resize-y rounded-none border border-line bg-paper p-4 text-base leading-7" placeholder="Start with a thought. See where it goes." spellcheck="true"></textarea>
+  </label>
+  <dl class="grid grid-cols-3 gap-4 border-t border-line pt-5" aria-live="polite" aria-atomic="true">
+    <div><dt class="eyebrow">Words</dt><dd class="mt-2 text-2xl" data-words>0</dd></div>
+    <div><dt class="eyebrow">Characters</dt><dd class="mt-2 text-2xl" data-characters>0</dd></div>
+    <div><dt class="eyebrow">Read time</dt><dd class="mt-2 text-2xl" data-time>0 min</dd></div>
+  </dl>
+  <p class="mt-5 text-xs leading-6 text-muted">An estimate at 200 words per minute. Everything stays in your browser; nothing is saved or sent.</p>
+  <noscript><p class="mt-4 text-sm">Enable JavaScript to use the live word counter.</p></noscript>
+</writing-desk>
+
+<script>
+  class WritingDesk extends HTMLElement {
+    connectedCallback() {
+      const textarea = this.querySelector('textarea');
+      const words = this.querySelector('[data-words]');
+      const characters = this.querySelector('[data-characters]');
+      const time = this.querySelector('[data-time]');
+      if (!textarea || !words || !characters || !time) {
+        throw new Error('Writing desk is missing required elements.');
+      }
+      const update = () => {
+        const text = textarea.value.trim();
+        const count = text ? text.split(/\s+/u).length : 0;
+        words.textContent = count.toLocaleString();
+        characters.textContent = Array.from(textarea.value).length.toLocaleString();
+        time.textContent = `${Math.ceil(count / 200)} min`;
+      };
+      textarea.oninput = update;
+      update();
+    }
+  }
+  if (!customElements.get('writing-desk')) {
+    customElements.define('writing-desk', WritingDesk);
+  }
+</script>

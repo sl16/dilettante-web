@@ -1,0 +1,21 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { withBase } from '../lib/paths';
+import { formatDate } from '../lib/posts';
+interface Props { post: CollectionEntry<'blog'>; index: number; }
+const { post, index } = Astro.props;
+---
+<article class="post-card">
+  <div class="mb-9 flex items-center justify-between">
+    <span class="eyebrow">{post.data.category}</span>
+    <span class="font-mono text-xs text-muted">{String(index + 1).padStart(2, '0')}</span>
+  </div>
+  <h2 class="mb-4 text-2xl font-medium leading-tight tracking-tight">
+    <a href={withBase(`blog/${post.id}/`)} class="card-link">{post.data.title}</a>
+  </h2>
+  <p class="mb-8 text-sm leading-7 text-muted">{post.data.description}</p>
+  <div class="mt-auto flex items-center justify-between text-xs text-muted">
+    <time datetime={post.data.published.toISOString()}>{formatDate(post.data.published)}</time>
+    <span class="card-arrow text-xl text-ink" aria-hidden="true">↗</span>
+  </div>
+</article>
