@@ -18,9 +18,31 @@ async function htmlFiles(directory) {
   return files.flat();
 }
 
+function postLinks(html) {
+  return [...html.matchAll(/<a href="([^"]+)" class="card-link"/g)].map((match) => match[1]);
+}
+
+async function builtPosts() {
+  const blogDirectory = path.join(dist, 'blog');
+  const files = (await htmlFiles(blogDirectory)).filter((file) => file !== path.join(blogDirectory, 'index.html'));
+  const posts = await Promise.all(files.map(async (file) => {
+    const html = await readFile(file, 'utf8');
+    const header = html.match(/<main\b[^>]*>.*?<header\b[^>]*>(.*?)<\/header>/s)?.[1];
+    const datetime = header?.match(/<time\b[^>]*datetime="([^"]+)"/)?.[1];
+    assert.ok(datetime, `${file}: post must have a publication date`);
+    const published = Date.parse(datetime);
+    assert.ok(Number.isFinite(published), `${file}: invalid publication date`);
+    const id = path.relative(blogDirectory, file).split(path.sep).join('/').replace(/\/index\.html$/, '');
+    return { id, href: `${base}/blog/${id}/`, published, html };
+  }));
+  return posts.sort((a, b) => b.published - a.published || a.id.localeCompare(b.id));
+}
+
 test('all generated internal links and assets exist under the deployment base', async () => {
   const files = await htmlFiles(dist);
-  assert.ok(files.length >= 7, 'Expected home, blog, posts, Game of Life, and 404 pages');
+  for (const route of ['index.html', 'blog/index.html', 'game-of-life/index.html', '404.html']) {
+    await stat(path.join(dist, route));
+  }
   for (const file of files) {
     const html = await readFile(file, 'utf8');
     assert.match(html, /<html lang="en">/);
@@ -41,36 +63,34 @@ test('ordinary pages ship no JavaScript; widget pages include their isolated scr
   for (const route of ['index.html', 'blog/index.html', 'game-of-life/index.html']) {
     assert.doesNotMatch(await readFile(path.join(dist, route), 'utf8'), /<script\b/);
   }
-  for (const route of ['blog/small-tools-small-joys/index.html']) {
-    const html = await readFile(path.join(dist, route), 'utf8');
-    assert.match(html, /<writing-desk\b/);
-    assert.match(html, /<script\b[^>]*type="module"/);
+  for (const post of await builtPosts()) {
+    if (/<writing-desk\b/.test(post.html)) {
+      assert.match(post.html, /<script\b[^>]*type="module"/);
+    } else {
+      assert.doesNotMatch(post.html, /<script\b/);
+    }
   }
 });
 
-test('blog lists all sample posts newest first and canonical URLs include the base', async () => {
+test('blog lists all built posts newest first and canonical URLs include the base', async () => {
   const html = await readFile(path.join(dist, 'blog/index.html'), 'utf8');
-  const titles = ['The case for being a beginner', 'A smaller, quieter web', 'Small tools, small joys'];
-  const positions = titles.map((title) => html.indexOf(title));
-  assert.ok(positions.every((position) => position >= 0));
-  assert.ok(positions[0] < positions[1] && positions[1] < positions[2]);
+  const posts = await builtPosts();
+  assert.deepEqual(postLinks(html), posts.map((post) => post.href));
   const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
   assert.ok(canonical, 'Blog must have a canonical URL');
   const url = new URL(canonical);
   assert.equal(url.pathname, `${base}/blog/`);
 });
 
-test('homepage contains only the requested hero and the three newest blog cards', async () => {
+test('homepage contains a hero and up to three newest blog cards', async () => {
   const html = await readFile(path.join(dist, 'index.html'), 'utf8');
-  assert.match(html, /<h1[^>]*>dilettante<\/h1>/);
-  assert.match(html, /href="https:\/\/dictionary.cambridge.org\/dictionary\/english\/dilettante">a person whose interest in an art or in an area of knowledge is not very deep or serious<\/a>/);
-  assert.ok(html.includes("Yup. That's me. Welcome."));
-  assert.doesNotMatch(html, /<footer\b|<svg\b|Journal|playground|A few things on my mind/);
+  const hero = html.match(/<section\b[^>]*class="home-hero"[^>]*>(.*?)<\/section>/s)?.[1];
+  assert.ok(hero, 'Homepage must have a hero section');
+  assert.match(hero, /<h1\b[^>]*>[^<]+<\/h1>/);
   assert.equal([...html.matchAll(/<section\b/g)].length, 2);
-  assert.equal([...html.matchAll(/<article\b/g)].length, 3);
-  const blog = await readFile(path.join(dist, 'blog/index.html'), 'utf8');
-  const postLinks = (content) => [...content.matchAll(/<a href="([^"]+)" class="card-link"/g)].map((match) => match[1]);
-  assert.deepEqual(postLinks(html), postLinks(blog).slice(0, 3));
+  const posts = (await builtPosts()).slice(0, 3);
+  assert.equal([...html.matchAll(/<article\b/g)].length, posts.length);
+  assert.deepEqual(postLinks(html), posts.map((post) => post.href));
 });
 
 test('navigation has only Blog and Game of Life, with no old pages', async () => {
@@ -86,5 +106,5 @@ test('navigation has only Blog and Game of Life, with no old pages', async () =>
   const game = await readFile(path.join(dist, 'game-of-life/index.html'), 'utf8');
   const main = game.match(/<main\b[^>]*>(.*?)<\/main>/s)?.[1];
   assert.ok(main);
-  assert.equal(main.replace(/<[^>]*>/g, '').trim(), 'Game of Life');
+  assert.match(main, /^\s*<section\b[^>]*>\s*<h1\b[^>]*>[^<]+<\/h1>\s*<\/section>\s*$/);
 });

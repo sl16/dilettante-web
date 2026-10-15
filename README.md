@@ -22,6 +22,8 @@ npm run preview # Serve the production build locally
 
 Build before running the tests. Commit the lockfile so local and CI installs match.
 
+Tests check generated routes, links, canonical URLs, JavaScript isolation, and post listing order using the built posts' publication dates. They do not assert exact prose or sample post titles, so routine writing edits do not require test changes.
+
 ## Structure
 
 ```text
