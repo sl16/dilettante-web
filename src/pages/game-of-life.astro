@@ -1,8 +1,283 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { compileGame, DAY_COUNT, getLevel, SKILLS, type Skill } from '../lib/game-of-life';
+import { formatDate, getPosts } from '../lib/posts';
+import { withBase } from '../lib/paths';
+
+const game = compileGame(await getPosts());
+const appearance = {
+  homesteading: { color: '#536b36', dash: '' },
+  exploration: { color: '#a65524', dash: '10 4' },
+  computers: { color: '#356c91', dash: '3 4' },
+  teaching: { color: '#956023', dash: '12 4 3 4' },
+  chronicling: { color: '#815b88', dash: '6 4' },
+  crafting: { color: '#a74759', dash: '12 4 3 4 3 4' },
+} satisfies Record<Skill, { color: string; dash: string }>;
+const number = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
+const skillLevels = SKILLS.map((skill) => ({ skill, ...getLevel(game.totals[skill]) }));
+const levelMax = Math.max(...skillLevels.map(({ level }) => level + 1));
+const shortDate = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const dateLabel = (date: string) => formatDate(new Date(`${date}T00:00:00Z`));
+const chartMax = Math.max(120, ...Object.values(game.totals));
+const x = (index: number) => 76 + index / (DAY_COUNT - 1) * 876;
+const y = (exp: number) => 252 - exp / chartMax * 224;
+const dateTicks = [0, 13, 43, 74, 99];
+const xpTicks = [0, 0.25, 0.5, 0.75, 1];
+const series = SKILLS.map((skill) => ({
+  skill,
+  points: game.days.map((day, index) => `${x(index)},${y(day.cumulative[skill])}`).join(' '),
+}));
+const daySummary = (day: typeof game.days[number], index: number) =>
+  `Day ${index + 1}, ${dateLabel(day.date)}: ${day.daily.length} of 4 dailies${day.daily.length ? ` (${day.daily.join(', ')})` : ''}.${day.postId !== undefined ? ' Read the day\'s post.' : ' No post logged.'}`;
 ---
-<BaseLayout title="Game of Life" description="Game of Life">
+<BaseLayout title="Game of Life" description="100 days of learning and everyday practice. Skill levels, experience, and daily activities, recorded through blog posts.">
   <section class="page-heading">
+    <p class="eyebrow mb-4 text-muted">100 days of deliberate practice</p>
     <h1 class="page-title">Game of Life</h1>
+    <p class="mt-6 max-w-2xl text-sm leading-7 text-muted">
+      Small efforts, added up. Six skills to develop and four dailies to keep returning to.
+      Each journal entry adds another day to the picture.
+    </p>
+    <div class="challenge-meta">
+      <p><time datetime="2026-10-19">19 October 2026</time> &ndash; <time datetime="2027-01-26">26 January 2027</time></p>
+      <p><strong>{game.loggedDays}</strong> / {DAY_COUNT} days logged</p>
+    </div>
+  </section>
+
+  <section class="game-section" aria-labelledby="skills-heading">
+    <div class="section-heading">
+      <h2 id="skills-heading">Skill levels</h2>
+      <p>Starting from zero. The first level takes 120 XP.</p>
+    </div>
+    <figure class="skill-chart">
+      <div class="skill-axis" aria-hidden="true">
+        <span>Skill</span>
+        <div><span>Level 0</span><span>Level {levelMax}</span></div>
+      </div>
+      <ol class="skill-bars">
+        {skillLevels.map(({ skill, level, totalXP, earned, required }) => (
+          <li class="skill-row" data-skill={skill} data-level={level} data-xp={totalXP} style={`--skill-color: ${appearance[skill].color}`}>
+            <div class="skill-name">
+              <h3 id={`skill-${skill}`}>{skill}</h3>
+              <p>Level {level}</p>
+            </div>
+            <div class="skill-measure">
+              <meter
+                id={`level-${skill}`}
+                min="0"
+                max={levelMax}
+                value={level + earned / required}
+                aria-labelledby={`skill-${skill}`}
+                aria-valuetext={`Level ${level}; ${number.format(earned)} of ${number.format(required)} XP toward level ${level + 1}`}
+              >Level {level}, {number.format(earned)} / {number.format(required)} XP toward the next level</meter>
+              <div class="skill-meta">
+                <p>{number.format(earned)} / {number.format(required)} XP to level {level + 1}</p>
+                <p>{number.format(totalXP)} total XP</p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <figcaption class="section-note">Bars share one level scale: completed levels plus the fraction of XP earned toward the next.</figcaption>
+    </figure>
+    <p class="section-note">Each level costs 120 &times; (current level + 1)<sup>1.5</sup> XP. Extra XP carries over; displayed values are rounded to two decimals.</p>
+  </section>
+
+  <section class="game-section" aria-labelledby="experience-heading">
+    <div class="section-heading">
+      <h2 id="experience-heading">Experience over time</h2>
+      <p>Cumulative XP across all 100 days. One XP represents roughly one minute of practice.</p>
+    </div>
+    <figure class="experience-chart">
+      <div class="chart-scroll" tabindex="0" role="region" aria-label="Cumulative XP chart, scroll horizontally on smaller screens">
+        <svg viewBox="0 0 980 308" role="img" aria-labelledby="xp-chart-title xp-chart-description">
+          <title id="xp-chart-title">Cumulative experience by skill</title>
+          <desc id="xp-chart-description">
+            From 19 October 2026 to 26 January 2027. Days without entries keep the previous total.
+            {SKILLS.map((skill) => `${skill}: ${number.format(game.totals[skill])} XP.`).join(' ')}
+            Exact daily totals are available in the table below.
+          </desc>
+          {xpTicks.map((fraction) => (
+            <g>
+              <line x1="76" x2="952" y1={y(chartMax * fraction)} y2={y(chartMax * fraction)} class="chart-gridline" />
+              <text x="64" y={y(chartMax * fraction) + 4} text-anchor="end">{number.format(chartMax * fraction)}</text>
+            </g>
+          ))}
+          <text x="76" y="15">XP</text>
+          {dateTicks.map((index) => (
+            <text x={x(index)} y="282" text-anchor={index === 0 ? 'start' : index === 99 ? 'end' : 'middle'}>
+              {shortDate.format(new Date(`${game.days[index].date}T00:00:00Z`))}
+            </text>
+          ))}
+          {series.map(({ skill, points }) => (
+            <polyline
+              data-skill={skill}
+              points={points}
+              fill="none"
+              stroke={appearance[skill].color}
+              stroke-dasharray={appearance[skill].dash}
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              vector-effect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+      </div>
+      <figcaption>
+        <ul class="chart-legend" aria-label="Skill line styles">
+          {SKILLS.map((skill) => (
+            <li>
+              <svg viewBox="0 0 32 8" aria-hidden="true">
+                <line x1="0" x2="32" y1="4" y2="4" stroke={appearance[skill].color} stroke-width="2.5" stroke-dasharray={appearance[skill].dash} />
+              </svg>
+              <span>{skill}</span>
+            </li>
+          ))}
+        </ul>
+        {Object.values(game.totals).every((xp) => xp === 0) && (
+          <p class="section-note">No XP logged yet. The lines will grow with each new skill entry.</p>
+        )}
+      </figcaption>
+    </figure>
+    <details class="game-data">
+      <summary>View daily totals and activities</summary>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Daily challenge data, scroll horizontally">
+        <table>
+          <caption>Cumulative XP and completed dailies for each challenge date</caption>
+          <thead>
+            <tr><th scope="col">Date</th>{SKILLS.map((skill) => <th scope="col">{skill}</th>)}<th scope="col">Dailies</th></tr>
+          </thead>
+          <tbody>
+            {game.days.map((day) => (
+              <tr>
+                <th scope="row"><time datetime={day.date}>{dateLabel(day.date)}</time></th>
+                {SKILLS.map((skill) => <td>{day.cumulative[skill]}</td>)}
+                <td>{day.daily.join(', ') || 'None'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <section class="game-section" aria-labelledby="dailies-heading">
+    <div class="section-heading">
+      <h2 id="dailies-heading">Showing up, daily</h2>
+      <p>Sport, cooking, cleaning, reading. A brighter cell means more dailies completed.</p>
+    </div>
+    <div class="heatmap-panel">
+      <div class="heatmap-range"><span>19 Oct 2026</span><span>26 Jan 2027</span></div>
+      <div class="heatmap-calendar">
+        <div class="heatmap-weekdays" aria-hidden="true">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => <span>{day}</span>)}
+        </div>
+        <ol class="daily-heatmap" aria-label="100 days of daily activities, arranged in weekly columns">
+          {game.days.map((day, index) => (
+            <li data-date={day.date} data-daily-count={day.daily.length}>
+              {day.postId !== undefined ? (
+                <a class="daily-cell" href={withBase(`blog/${day.postId}/`)} title={daySummary(day, index)} aria-label={daySummary(day, index)}></a>
+              ) : (
+                <span class="daily-cell" role="img" title={daySummary(day, index)} aria-label={daySummary(day, index)}></span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div class="heatmap-footer">
+        <p>Each column is a week. Select a logged day to read its post.</p>
+        <ol class="heatmap-key" aria-label="Heatmap legend: number of completed dailies">
+          {[0, 1, 2, 3, 4].map((count) => (
+            <li data-daily-count={count}>
+              <span class="key-cell" aria-hidden="true"></span><span>{count}<span class="sr-only"> dailies</span></span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="game-section" aria-labelledby="journal-heading">
+    <div class="section-heading">
+      <h2 id="journal-heading">The journal</h2>
+      <p>All Game of Life posts, newest first. Only dates within the challenge count above.</p>
+    </div>
+    {game.posts.length ? (
+      <div class="grid gap-4 md:grid-cols-3">
+        {game.posts.map((post, index) => <PostCard post={post} index={index} />)}
+      </div>
+    ) : (
+      <p class="empty-journal">No entries yet. The first Game of Life post will appear here after the next build.</p>
+    )}
   </section>
 </BaseLayout>
+
+<style>
+  .challenge-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 32px; font-family: var(--font-mono); font-size: 12px; color: var(--color-muted); }
+  .challenge-meta strong { color: var(--color-ink); }
+  .game-section + .game-section { margin-top: 56px; }
+  .section-heading { margin-bottom: 24px; }
+  .section-heading h2 { font-size: 25px; font-weight: 500; letter-spacing: -.035em; }
+  .section-heading p, .section-note { margin-top: 8px; font-size: 12px; line-height: 1.8; color: var(--color-muted); }
+  .section-note { margin-top: 16px; }
+  .skill-axis, .skill-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 24px; }
+  .skill-axis { margin-bottom: 24px; font-family: var(--font-mono); font-size: 10px; color: var(--color-muted); }
+  .skill-axis > div { display: flex; justify-content: space-between; }
+  .skill-bars { display: grid; gap: 24px; }
+  .skill-name h3 { font-size: 14px; text-transform: capitalize; }
+  .skill-name p { margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); }
+  meter { display: block; width: 100%; height: 20px; border: 0; border-radius: 0; background: #e8e8e0; appearance: none; }
+  meter::-webkit-meter-bar { height: 20px; border: 0; border-radius: 0; box-shadow: none; background: #e8e8e0; }
+  meter::-webkit-meter-optimum-value { background: var(--skill-color); }
+  meter::-moz-meter-bar { background: var(--skill-color); }
+  .skill-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-top: 8px; font-family: var(--font-mono); font-size: 10px; line-height: 1.7; color: var(--color-muted); }
+  .skill-chart, .experience-chart, .heatmap-panel { border: 1px solid var(--color-line); padding: 24px; }
+  .chart-scroll, .table-scroll { overflow-x: auto; }
+  .chart-scroll > svg { display: block; width: 100%; min-width: 620px; }
+  .chart-scroll text { font-family: var(--font-mono); font-size: 11px; fill: var(--color-muted); }
+  .chart-gridline { stroke: var(--color-line); stroke-width: 1; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 12px; }
+  .chart-legend li { display: flex; align-items: center; gap: 8px; font-size: 11px; text-transform: capitalize; }
+  .chart-legend svg { width: 32px; height: 8px; }
+  .game-data { margin-top: 16px; font-size: 12px; }
+  .game-data summary { width: fit-content; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+  .table-scroll { margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-family: var(--font-mono); font-size: 11px; }
+  caption { padding-bottom: 12px; text-align: left; color: var(--color-muted); }
+  th, td { padding: 10px; border-bottom: 1px solid var(--color-line); white-space: nowrap; }
+  thead th { text-transform: capitalize; }
+  .heatmap-range { display: flex; justify-content: space-between; margin: 0 0 12px 36px; font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); }
+  .heatmap-calendar { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+  .heatmap-weekdays { display: grid; grid-template-rows: repeat(7, 1fr); gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--color-muted); }
+  .heatmap-weekdays span { display: flex; align-items: center; }
+  .daily-heatmap { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 5px; }
+  [data-daily-count="0"] { --daily-color: #e8e8e0; }
+  [data-daily-count="1"] { --daily-color: #d4e4b8; }
+  [data-daily-count="2"] { --daily-color: #a6ce78; }
+  [data-daily-count="3"] { --daily-color: #71ae40; }
+  [data-daily-count="4"] { --daily-color: #42851e; }
+  .daily-cell { display: block; width: 100%; aspect-ratio: 1.8; min-height: 12px; border: 1px solid rgb(32 32 30 / 8%); background: var(--daily-color); border-radius: 2px; }
+  a.daily-cell:hover { outline: 1px solid var(--color-ink); outline-offset: 1px; }
+  .heatmap-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; font-size: 11px; color: var(--color-muted); }
+  .heatmap-key { display: flex; gap: 10px; }
+  .heatmap-key li { display: flex; align-items: center; gap: 4px; }
+  .key-cell { display: block; width: 12px; height: 12px; background: var(--daily-color); border: 1px solid rgb(32 32 30 / 8%); border-radius: 2px; }
+  .empty-journal { padding: 28px; border: 1px dashed var(--color-line); font-size: 14px; line-height: 1.8; color: var(--color-muted); }
+  @media (max-width: 767px) {
+    .skill-axis, .skill-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .skill-axis > span { display: none; }
+    .skill-name { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+    .skill-name p { margin-top: 0; }
+    .skill-chart, .experience-chart, .heatmap-panel { padding: 16px; }
+    .game-section + .game-section { margin-top: 40px; }
+    .daily-heatmap, .heatmap-weekdays { gap: 3px; }
+    .daily-cell { aspect-ratio: 1; }
+  }
+  @media (max-width: 380px) {
+    .heatmap-panel { padding: 12px; }
+    .heatmap-calendar { grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+    .heatmap-weekdays { font-size: 9px; }
+    .daily-heatmap { gap: 2px; }
+  }
+</style>

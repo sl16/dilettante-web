@@ -99,8 +99,39 @@ test('navigation has only Blog and Game of Life, with no old pages', async () =>
   for (const route of ['about', 'tools']) {
     await assert.rejects(stat(path.join(dist, route)), { code: 'ENOENT' });
   }
-  const game = await readFile(path.join(dist, 'game-of-life/index.html'), 'utf8');
-  const main = game.match(/<main\b[^>]*>(.*?)<\/main>/s)?.[1];
-  assert.ok(main);
-  assert.match(main, /^\s*<section\b[^>]*>\s*<h1\b[^>]*>[^<]+<\/h1>\s*<\/section>\s*$/);
+});
+
+test('Game of Life renders six skills, a 100-day chart and heatmap, and its newest-first posts', async () => {
+  const html = await readFile(path.join(dist, 'game-of-life/index.html'), 'utf8');
+  const sections = [...html.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(sections, ['skills-heading', 'experience-heading', 'dailies-heading', 'journal-heading']);
+  const skills = ['homesteading', 'exploration', 'computers', 'teaching', 'chronicling', 'crafting'];
+  assert.equal([...html.matchAll(/<figure class="skill-chart"/g)].length, 1);
+  assert.deepEqual([...html.matchAll(/<li\b[^>]*data-skill="([^"]+)"/g)].map((match) => match[1]), skills);
+  const bars = [...html.matchAll(/<meter\b[^>]*id="level-([^"]+)"[^>]*max="([^"]+)"[^>]*value="([^"]+)"/g)];
+  assert.deepEqual(bars.map((match) => match[1]), skills);
+  assert.equal(new Set(bars.map((match) => match[2])).size, 1);
+  assert.ok(bars.every((match) => Number(match[3]) >= 0 && Number(match[3]) < Number(match[2])));
+  const lines = [...html.matchAll(/<polyline\b[^>]*data-skill="([^"]+)"[^>]*points="([^"]+)"/g)];
+  assert.deepEqual(lines.map((match) => match[1]), skills);
+  for (const [, , points] of lines) {
+    assert.equal(points.trim().split(/\s+/).length, 100);
+    assert.ok(points.trim().split(/[\s,]+/).every((coordinate) => Number.isFinite(Number(coordinate))));
+  }
+  const cells = [...html.matchAll(/<li\b[^>]*data-date="([^"]+)"[^>]*data-daily-count="(\d)"/g)];
+  assert.equal(cells.length, 100);
+  assert.equal(cells[0][1], '2026-10-19');
+  assert.equal(cells[99][1], '2027-01-26');
+  assert.ok(cells.every((cell) => Number(cell[2]) <= 4));
+  const posts = (await builtPosts()).filter((post) => {
+    const header = post.html.match(/<main\b[^>]*>.*?<header\b[^>]*>(.*?)<\/header>/s)?.[1];
+    return /class="eyebrow[^"]*"[^>]*>Game of Life<\/span>/.test(header ?? '');
+  });
+  assert.deepEqual(postLinks(html), posts.map((post) => post.href));
+  if (!posts.length) {
+    assert.match(html, /No entries yet/);
+    assert.match(html, /No XP logged yet/);
+    assert.equal([...html.matchAll(/data-level="0" data-xp="0"/g)].length, 6);
+    assert.ok(bars.every((match) => match[2] === '1' && match[3] === '0'));
+  }
 });
