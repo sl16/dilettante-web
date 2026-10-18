@@ -57,20 +57,6 @@ draft: false
 
 Write the body below the frontmatter. The filename becomes the URL; nested folders also work. Posts are sorted newest first. `draft: true` excludes a post from both listings and generated routes, including local development. Dates are displayed in UTC. Build again to publish edits.
 
-## Add a widget or mini-app
-
-Create a component under `src/components/widgets/`. An Astro component with a scoped `<script>` and custom element is enough for lightweight interactivity; the writing desk is a working example. Keep DOM queries inside the element so multiple instances remain independent.
-
-Embed the component in an MDX post:
-
-```mdx
-import WritingDesk from '../../components/widgets/WritingDesk.astro';
-
-<WritingDesk />
-```
-
-Astro includes the script only on pages using that component, and deduplicates it when used more than once. Provide accessible labels, a no-JavaScript explanation, and explicit error handling. For larger apps, add the appropriate Astro UI integration and use a `client:visible` or `client:load` island; there is no need to hydrate the whole site.
-
 `src/pages/game-of-life.astro` intentionally contains only its title for now.
 
 Use `withBase()` from `src/lib/paths.ts` for internal links and public assets in Astro components. In MDX, import that helper when linking to internal routes rather than hard-coding `/blog/`. Prefer relative Markdown images or base-aware public asset URLs.

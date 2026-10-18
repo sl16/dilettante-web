@@ -59,16 +59,12 @@ test('all generated internal links and assets exist under the deployment base', 
   }
 });
 
-test('ordinary pages ship no JavaScript; widget pages include their isolated script', async () => {
+test('pages ship no JavaScript', async () => {
   for (const route of ['index.html', 'blog/index.html', 'game-of-life/index.html']) {
     assert.doesNotMatch(await readFile(path.join(dist, route), 'utf8'), /<script\b/);
   }
   for (const post of await builtPosts()) {
-    if (/<writing-desk\b/.test(post.html)) {
-      assert.match(post.html, /<script\b[^>]*type="module"/);
-    } else {
-      assert.doesNotMatch(post.html, /<script\b/);
-    }
+    assert.doesNotMatch(post.html, /<script\b/);
   }
 });
 

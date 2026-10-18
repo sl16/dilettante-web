@@ -52,7 +52,6 @@
   .prose pre { padding: 20px; overflow-x: auto; font-size: 13px; line-height: 1.7; }
   .prose :not(pre) > code { font-size: .85em; background: #eaeae4; padding: 2px 5px; }
   .prose img { max-width: 100%; height: auto; }
-  .writing-desk { display: block; border: 1px solid var(--color-line); padding: 24px; }
   .skip-link { position: absolute; top: 12px; left: 12px; z-index: 10; padding: 12px 20px; background: var(--color-ink); color: var(--color-paper); transform: translateY(-150%); }
   .skip-link:focus { transform: translateY(0); }
 }
@@ -64,7 +63,6 @@
 
 @media (max-width: 380px) {
   .shell { width: calc(100% - 32px); }
-  .writing-desk { padding: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
